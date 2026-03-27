@@ -663,6 +663,16 @@ nav{
   cursor:pointer;transition:all 0.18s;
 }
 .export-btn:hover{border-color:var(--teal);color:var(--teal);}
+
+/* ── SHARED MODALS & TOAST ── */
+.app-modal-overlay{display:none;position:fixed;inset:0;z-index:10000;background:rgba(6,9,15,0.88);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:16px;}
+.app-modal-box{background:var(--bg1);border:1px solid var(--border2);border-radius:14px;width:min(980px,96vw);max-height:92vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,0.6);animation:fadeUp 0.25s ease;}
+.app-modal-header{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg1);z-index:1;}
+.app-modal-close{width:30px;height:30px;border-radius:50%;background:var(--bg3);border:1px solid var(--border);color:var(--text2);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.18s;}
+.app-modal-close:hover{border-color:var(--teal);color:var(--teal);}
+.app-toast{position:fixed;right:18px;bottom:18px;z-index:10020;background:var(--bg1);border:1px solid var(--border2);border-left:3px solid var(--teal);border-radius:10px;padding:10px 12px;min-width:260px;max-width:420px;box-shadow:0 16px 48px rgba(0,0,0,0.45);font-size:11px;color:var(--text2);line-height:1.5;animation:fadeUp 0.18s ease;}
+.app-toast strong{color:var(--text);}
+
 </style>
 </head>
 <body>
@@ -720,7 +730,6 @@ nav{
   <div class="topbar">
     <div class="topbar-title" id="topbar-title">Global Treasury Overview</div>
     <div class="topbar-right">
-      <div class="topbar-chip alert">⚠ 2 Alerts</div>
       <div class="topbar-chip alert" id="chip-alerts">⚠ 1 Alert</div>
       <div class="topbar-chip ok">● GENIUS Act: Monitoring</div>
       <div class="topbar-chip" id="market-data-badge">● Loading market data...</div>
@@ -908,10 +917,15 @@ nav{
 
         <!-- COMPLIANCE SCORES SUMMARY -->
         <div class="card col-1">
-          <div class="card-tag">Compliance Scores</div>
-          <div class="card-title">By Issuer</div>
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+            <div>
+              <div class="card-tag">Compliance Scores</div>
+              <div class="card-title">By Issuer</div>
+            </div>
+            <button onclick="openScoreExplainModal()" style="padding:6px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;color:var(--text2);font-family:var(--mono);font-size:10px;cursor:pointer;white-space:nowrap;transition:all 0.18s;" onmouseover="this.style.borderColor='var(--teal)';this.style.color='var(--teal)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'">ⓘ How it is calculated</button>
+          </div>
           <div style="margin-top:8px;">
-            <div class="score-row">
+            <div class="score-row" style="cursor:pointer;" onclick="openScoreExplainModal()">
               <div class="score-row-header">
                 <span class="score-token" style="color:#1a7aff;">USDC</span>
                 <span class="score-num" style="color:var(--teal);">95/100</span>
@@ -919,7 +933,7 @@ nav{
               <div class="score-bar"><div class="score-bar-fill" style="width:95%;background:var(--teal);"></div></div>
               <div class="score-note">Full T-bill/cash reserves · Deloitte · BlackRock</div>
             </div>
-            <div class="score-row">
+            <div class="score-row" style="cursor:pointer;" onclick="openScoreExplainModal()">
               <div class="score-row-header">
                 <span class="score-token" style="color:#00d4aa;">USAT</span>
                 <span class="score-num" style="color:var(--teal);">80/100</span>
@@ -927,13 +941,21 @@ nav{
               <div class="score-bar"><div class="score-bar-fill" style="width:80%;background:var(--teal);"></div></div>
               <div class="score-note">OCC-chartered · Early stage · Cantor Fitzgerald</div>
             </div>
-            <div class="score-row">
+            <div class="score-row" style="cursor:pointer;" onclick="openScoreExplainModal()">
               <div class="score-row-header">
                 <span class="score-token" style="color:#ff4757;">USDT</span>
                 <span class="score-num" style="color:var(--red);">15/100</span>
               </div>
               <div class="score-bar"><div class="score-bar-fill" style="width:15%;background:var(--red);"></div></div>
               <div class="score-note">BTC+gold reserves · Not US-licensed · CFTC history</div>
+            </div>
+            <div class="score-row" style="cursor:pointer;" onclick="openScoreExplainModal()">
+              <div class="score-row-header">
+                <span class="score-token" style="color:#f5a623;">USDY</span>
+                <span class="score-num" style="color:var(--amber);">40/100</span>
+              </div>
+              <div class="score-bar"><div class="score-bar-fill" style="width:40%;background:var(--amber);"></div></div>
+              <div class="score-note">Treasury-backed · Yield-bearing · Restricted to non-US investors</div>
             </div>
           </div>
         </div>
@@ -2141,6 +2163,8 @@ const ROUTES = {
 
 let currentCorridor = 'SGD→VND';
 let currentPriority = 'safety';
+const HAS_CHART = () => typeof window.Chart !== 'undefined';
+
 
 /* ════════════════════════════════════════
    NAVIGATION
@@ -2178,7 +2202,7 @@ document.addEventListener('keydown', e => {
     return;
   }
   // P: presentation mode toggle
-  if(e.key === 'p' || e.key === 'P' && !e.target.matches('input,textarea')){
+  if((e.key === 'p' || e.key === 'P') && !e.target.matches('input,textarea')){
     togglePresentationMode();
   }
   // ← → arrow keys: prev/next page
@@ -2195,17 +2219,23 @@ document.addEventListener('keydown', e => {
   }
 });
 
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape') closeTopModal();
+});
+
 /* ── PRESENTATION MODE ── */
 let presentationMode = false;
 function togglePresentationMode(){
   presentationMode = !presentationMode;
   const nav = document.querySelector('nav');
   const btn = document.getElementById('pres-mode-btn');
-  if(nav) nav.style.display = presentationMode ? 'none' : '';
-  document.querySelector('.main').style.marginLeft = presentationMode ? '0' : '';
-  document.querySelector('.pages').style.maxWidth = presentationMode ? '100%' : '';
+  const main = document.querySelector('.main');
+  const pages = document.querySelector('.pages');
+  if(nav) nav.style.display = presentationMode ? 'none' : 'flex';
+  if(main) main.style.marginLeft = presentationMode ? '0' : '';
+  if(pages) pages.style.maxWidth = presentationMode ? '100%' : '';
   if(btn) btn.textContent = presentationMode ? '⊡ Exit Pres.' : '⊡ Present';
-  if(btn) btn.style.color = presentationMode ? 'var(--teal)' : '';
+  if(btn) btn.style.color = presentationMode ? 'var(--teal)' : 'var(--text2)';
 }
 
 function showPage(id, el){
@@ -2332,6 +2362,7 @@ let corridorChart = null;
 function initCorridorCostChart(){
   const ctx = document.getElementById('corridorCostChart');
   if(!ctx) return;
+  if(!HAS_CHART()){ showToast('Charts unavailable', 'Chart.js did not load. Cost comparison chart hidden, but the dashboard remains usable.', 'warn'); return; }
   if(corridorChart) corridorChart.destroy();
   corridorChart = new Chart(ctx,{
     type:'bar',
@@ -2666,6 +2697,10 @@ function calcPortfolio(){
   // Redraw portfolio allocation donut
   const portCtx = document.getElementById('portDonut');
   if(portCtx){
+    if(!HAS_CHART()){
+      const c = portCtx.closest('div');
+      if(c) c.innerHTML = '<div style="font-size:10px;color:var(--text3);text-align:center;padding-top:40px;">Chart unavailable</div>';
+    } else {
     if(window._portDonutChart) window._portDonutChart.destroy();
     const donutData = [], donutColors = [], donutLabels = [];
     if(usdc>0){ donutData.push(usdc); donutColors.push('#1a7aff'); donutLabels.push('USDC'); }
@@ -2686,6 +2721,7 @@ function calcPortfolio(){
         }
       }
     });
+    }
   }
 
   // Scroll results into view smoothly
@@ -2758,6 +2794,7 @@ function filterTx(filter,btn){
 /* TX DETAIL MODAL */
 function openTxModal(i){
   const t=TX_DATA[i];
+  if(!t) return;
   const hash=TX_HASHES[i];
   const block=TX_BLOCKS[i];
   const chain=t.rail.includes('Solana')?'solana':t.rail.includes('Tron')?'tron':t.rail.includes('SWIFT')?null:'ethereum';
@@ -2823,10 +2860,13 @@ function openTxModal(i){
       &#x26A0; <strong>Compliance note:</strong> This transaction used USDT, which is not GENIUS Act compliant for US operations. For the ${t.corridor} corridor with no US-touching counterparties, this payment is permissible. Rotate USDT holdings to USDC or USAT before next US payment cycle.
     </div>`:''}
   `;
-  document.getElementById('txModal').style.display='flex';
+  const modal = document.getElementById('txModal');
+  if(modal){ modal.style.display='flex'; lockBodyScroll(); }
 }
 function closeTxModal(){
-  document.getElementById('txModal').style.display='none';
+  const modal = document.getElementById('txModal');
+  if(modal) modal.style.display='none';
+  unlockBodyScroll();
 }
 
 /* ════════════════════════════════════════
@@ -2834,13 +2874,17 @@ function closeTxModal(){
 ════════════════════════════════════════ */
 // Brightfield's exposed holdings for depeg calc
 // Depeg exposure = USDC + USDT holdings (USAT excluded — OCC bank deposit, not market stablecoin)
-const DEPEG_EXPOSURE = STABLECOIN_BALANCES
-  .filter(p => p.token === 'USDC' || p.token === 'USDT')
-  .reduce((s, p) => s + p.amount, 0); // USDC $300K + USDT $100K
+function getDepegExposure(){
+  const balances = Array.isArray(globalThis.STABLECOIN_BALANCES) ? globalThis.STABLECOIN_BALANCES : [];
+  return balances
+    .filter(p => p.token === 'USDC' || p.token === 'USDT')
+    .reduce((s, p) => s + p.amount, 0);
+}
 
 function updateDepegImpact(pct){
   const p = parseFloat(pct);
-  const impact = -(DEPEG_EXPOSURE * p / 100);
+  const exposure = getDepegExposure();
+  const impact = -(exposure * p / 100);
   const label = document.getElementById('depeg-pct-label');
   const live  = document.getElementById('depeg-impact-live');
   const sub   = document.getElementById('depeg-impact-sub');
@@ -2853,8 +2897,8 @@ function updateDepegImpact(pct){
   const impactStr = '-$'+Math.abs(impact).toLocaleString();
   if(live)  live.textContent  = impactStr;
   if(main)  main.textContent  = impactStr;
-  if(sub)   sub.textContent   = `on $${DEPEG_EXPOSURE.toLocaleString()} USDC+USDT holdings`;
-  if(mainSub) mainSub.textContent = `At ${p.toFixed(1)}% depeg · $${DEPEG_EXPOSURE.toLocaleString()} exposed`;
+  if(sub)   sub.textContent   = `on $${exposure.toLocaleString()} USDC+USDT holdings`;
+  if(mainSub) mainSub.textContent = `At ${p.toFixed(1)}% depeg · $${exposure.toLocaleString()} exposed`;
 
   // Dynamic risk level
   let risk, riskColor, riskNote;
@@ -3093,6 +3137,8 @@ function exportBusinessCase(){
   const now           = new Date();
 
   const win = window.open('', '_blank');
+  if(!win){ showToast('Popup blocked', 'Allow popups for this site to open the Business Case export.', 'warn'); return; }
+  showToast('Business Case export', 'A print-ready window has opened in a new tab.', 'info');
   win.document.write(`<!DOCTYPE html><html><head><title>Business Case — Stablecoin Payment Rails</title>
   <style>
     body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#111;padding:48px;max-width:720px;margin:0 auto;font-size:13px;line-height:1.7;}
@@ -3216,6 +3262,8 @@ function exportAudit(){
   const udtDue  = nextDue(ATTEST.USDT.lastDate, 'Quarterly');
 
   const win = window.open('','_blank');
+  if(!win){ showToast('Popup blocked', 'Allow popups for this site to open the Audit Export.', 'warn'); return; }
+  showToast('Audit export', 'A print-ready audit pack has opened in a new tab.', 'info');
   win.document.write(`<!DOCTYPE html><html lang="en"><head>
   <meta charset="UTF-8">
   <title>Stablecoin Treasury Audit Report — ${exportId}</title>
@@ -3551,7 +3599,7 @@ function applyAttestationDates(){
 async function fetchCircleAttestationDate(){
   try {
     const url = 'https://api.allorigins.win/get?url=' + encodeURIComponent('https://www.circle.com/en/transparency');
-    const res  = await fetch(url, { signal: AbortSignal.timeout(6000) });
+    const res  = await fetch(url, { signal: AbortSignal.timeout(10000) });
     if(!res.ok) throw new Error('proxy failed');
     const data = await res.json();
     const html = data.contents || '';
@@ -3690,7 +3738,7 @@ async function fetchPegPrices(){
   const cached = cacheGet('peg_prices', 60000);
   if(cached){ applyPegData(cached); return; }
   try {
-    const res  = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=usd-coin,tether,ondo-us-dollar-yield&vs_currencies=usd&include_24hr_change=true&precision=6', {signal: AbortSignal.timeout(5000)});
+    const res  = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=usd-coin,tether,ondo-us-dollar-yield&vs_currencies=usd&include_24hr_change=true&precision=6', {signal: AbortSignal.timeout(8000)});
     if(!res.ok) throw new Error(res.status);
     const data = await res.json();
     const pd   = {
@@ -3776,6 +3824,7 @@ async function fetchSparklines(){
 
 function drawSparkline(labels, usdcV, usdtV){
   const ctx=document.getElementById('sparklineChart'); if(!ctx) return;
+  if(!HAS_CHART()) return;
   if(sparklineChart){ sparklineChart.destroy(); sparklineChart=null; }
   sparklineChart = new Chart(ctx, {
     type:'line',
@@ -3848,7 +3897,7 @@ function updateWalletSyncTimes(){
   if(el('sync-cb-eth')) el('sync-cb-eth').textContent = t1;
   if(el('sync-cb-sol')) el('sync-cb-sol').textContent = t2;
   if(el('sync-anc'))    el('sync-anc').textContent    = t3;
-  if(el('sync-krk'))    el('sync-krk').textContent    = t4;
+  if(el('sync-krak'))   el('sync-krak').textContent   = t4;
 }
 
 function updateTxSummary(){
@@ -3917,6 +3966,7 @@ function filterCashflow(type, btn){
 }
 function renderCashflowChart(){
   const ctx = document.getElementById('cashflowChart'); if(!ctx) return;
+  if(!HAS_CHART()) return;
   if(cashflowChartInstance){ cashflowChartInstance.destroy(); cashflowChartInstance=null; }
 
   let balance = OPENING_BALANCE;
@@ -4035,7 +4085,7 @@ function openInitiatePayment() {
   const m = document.getElementById('initiateModal');
   if(!m) return;
   m.style.display = 'flex';
-  document.body.style.overflow = 'hidden';
+  lockBodyScroll();
   // Populate outflow chips
   const chips = document.getElementById('ipm-outflow-chips');
   if(chips) {
@@ -4052,7 +4102,7 @@ function openInitiatePayment() {
 function closeInitiatePayment() {
   const m = document.getElementById('initiateModal');
   if(m) m.style.display = 'none';
-  document.body.style.overflow = '';
+  unlockBodyScroll();
   ipmStep = 1;
 }
 
@@ -4296,6 +4346,7 @@ let cashflowChart = null;
 
 function initCashflowChart() {
   const ctx = document.getElementById('cashflowChart'); if(!ctx) return;
+  if(!HAS_CHART()) return;
   if(cashflowChart) { cashflowChart.destroy(); cashflowChart = null; }
 
   const labels   = [];
@@ -4527,8 +4578,6 @@ function renderFXExposure() {
   // Update hedging estimate (3% move on SGD positions)
   const sgdPositions = FIAT_POSITIONS.filter(p=>p.currency==='SGD');
   const sgdUSD = sgdPositions.reduce((s,p)=>s+(hasRates?fxConvert(p.balance,'SGD','USD'):0),0);
-  const hedgeEst = document.getElementById('fx-hedge-est');
-  if(hedgeEst) hedgeEst.textContent = '$'+Math.round(sgdUSD*0.03).toLocaleString();
 
   // Dynamic hedging recommendation
   const hedgeEl = document.getElementById('fx-hedge-note');
@@ -4541,7 +4590,7 @@ function renderFXExposure() {
       const names = [...new Set(highRisk.map(p => p.currency))].join(', ');
       const banks = [...new Set(highRisk.map(p => p.bank).filter(Boolean))].join(' / ');
       hedgeEl.innerHTML = '<strong style="color:var(--amber);">⚠ Hedging Consideration:</strong> ' +
-        names + ' positions exceed 20% of treasury. Consider FX forward contracts via ' +
+        names + ' positions exceed 20% of treasury. A 3% adverse move in SGD alone would imply roughly <strong style="color:var(--text);">$' + Math.round(sgdUSD*0.03).toLocaleString() + '</strong> of mark-to-market impact. Consider FX forward contracts via ' +
         (banks || 'DBS / Citibank') + ' to lock rates ahead of next payment cycle.';
       hedgeEl.style.background = 'rgba(245,166,35,0.06)';
       hedgeEl.style.borderLeft  = '3px solid var(--amber)';
@@ -5332,6 +5381,38 @@ async function fetchChainFlow() {
 ════════════════════════════════════════════════════════ */
 
 /* ════════════════════════════════════════
+   MODALS
+════════════════════════════════════════ */
+function lockBodyScroll(){ document.body.style.overflow = 'hidden'; }
+function unlockBodyScroll(){ document.body.style.overflow = ''; }
+function showToast(title, message, tone='info'){
+  const existing = document.getElementById('appToast');
+  if(existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.id = 'appToast';
+  toast.className = 'app-toast';
+  toast.style.borderLeftColor = tone==='warn' ? 'var(--amber)' : tone==='error' ? 'var(--red)' : 'var(--teal)';
+  toast.innerHTML = `<strong>${title}</strong><div style="margin-top:2px;">${message}</div>`;
+  document.body.appendChild(toast);
+  setTimeout(()=>toast.remove(), 3200);
+}
+function closeTopModal(){
+  ['scoreExplainModal','txModal','initiateModal'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el && el.style.display === 'flex') el.style.display = 'none';
+  });
+  unlockBodyScroll();
+}
+function openScoreExplainModal(){
+  const el = document.getElementById('scoreExplainModal');
+  if(el){ el.style.display = 'flex'; lockBodyScroll(); }
+}
+function closeScoreExplainModal(){
+  const el = document.getElementById('scoreExplainModal');
+  if(el){ el.style.display = 'none'; unlockBodyScroll(); }
+}
+
+/* ════════════════════════════════════════
    OVERVIEW CHARTS
 ════════════════════════════════════════ */
 window.addEventListener('load', () => {
@@ -5339,6 +5420,7 @@ window.addEventListener('load', () => {
 
   // 1. Concentration donut
   try {
+    if(!HAS_CHART()) throw new Error('Chart.js unavailable');
     const _concData   = STABLECOIN_BALANCES.map(p=>p.amount);
     const _concLabels = STABLECOIN_BALANCES.map(p=>p.token+' ('+p.custodian.split(' ')[0]+')');
     const _concColors = STABLECOIN_BALANCES.map(p=>p.color);
@@ -5417,6 +5499,18 @@ window.addEventListener('load', () => {
   // 12. Stress page default
   try { setTimeout(() => { const d = document.querySelector('.scenario-card'); if(d) selectScenario('depeg', d); }, 150); } catch(e) {}
 
+  // 12a. Warn if charts library failed to load
+  try { if(!HAS_CHART()) showToast('Presentation note', 'Chart.js did not load. Text, tables and calculations still work, but charts will remain hidden.', 'warn'); } catch(e) {}
+  try {
+    if (location.protocol === 'file:') {
+      showToast(
+        'Live data tip',
+        'This dashboard is running as a local file (file://). Some public APIs may reject requests from origin null, so FX and stablecoin widgets can fall back to offline mode. Serve it via http://localhost before presenting.',
+        'warn'
+      );
+    }
+  } catch(e) {}
+
   // 12b. GENIUS Act 2028 countdown
   try {
     const deadline = new Date('2028-07-18');
@@ -5471,7 +5565,7 @@ window.addEventListener('load', () => {
   <div style="background:var(--bg1);border:1px solid var(--border2);border-radius:14px;width:640px;max-width:96vw;max-height:92vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,0.6);animation:fadeUp 0.25s ease;">
 
     <!-- Header -->
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:18px 22px 14px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg1);z-index:1;">
+    <div class="app-modal-header" style="padding:18px 22px 14px;">
       <div>
         <div id="ipm-title" style="font-family:var(--display);font-size:17px;font-weight:700;">Initiate Payment</div>
         <div id="ipm-subtitle" style="font-size:11px;color:var(--text3);margin-top:2px;">Step 1 of 3 — Payment details</div>
@@ -5632,6 +5726,119 @@ window.addEventListener('load', () => {
       <button id="ipm-back-btn" onclick="ipmBack()" style="display:none;padding:9px 18px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text2);font-family:var(--display);font-size:12px;font-weight:600;cursor:pointer;">← Back</button>
       <button onclick="closeInitiatePayment()" style="padding:9px 18px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text2);font-family:var(--display);font-size:12px;font-weight:600;cursor:pointer;">Cancel</button>
       <button id="ipm-next-btn" onclick="ipmNext()" class="cta-btn" style="padding:9px 22px;font-size:12px;">Review Payment →</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- TX DETAIL MODAL -->
+<div class="app-modal-overlay" id="txModal" onclick="if(event.target===this)closeTxModal()">
+  <div class="app-modal-box" style="width:min(760px,96vw);">
+    <div class="app-modal-header">
+      <div style="font-family:var(--display);font-size:16px;font-weight:700;">Transaction Detail</div>
+      <button class="app-modal-close" onclick="closeTxModal()">✕</button>
+    </div>
+    <div id="txModalBody" style="padding:18px 20px 20px;"></div>
+  </div>
+</div>
+
+<!-- COMPLIANCE SCORE EXPLAINER MODAL -->
+<div class="app-modal-overlay" id="scoreExplainModal" onclick="if(event.target===this)closeScoreExplainModal()" style="z-index:10001;">
+  <div class="app-modal-box" style="width:min(980px,96vw);">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:18px 22px 14px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg1);z-index:1;">
+      <div>
+        <div style="font-family:var(--display);font-size:18px;font-weight:700;">How are the compliance scores calculated?</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:3px;">Assigned scorecard based on six GENIUS Act criteria and issuer-specific qualitative deductions</div>
+      </div>
+      <button class="app-modal-close" onclick="closeScoreExplainModal()">✕</button>
+    </div>
+    <div style="padding:18px 22px 22px;">
+      <div style="font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:14px;">
+        The scores (<strong style="color:var(--text);">USDC 95, USAT 80, USDT 15, USDY 40</strong>) are assigned values in the
+        <span style="font-family:var(--mono);color:#ff8a94;background:rgba(255,138,148,0.08);padding:2px 6px;border-radius:6px;">GENIUS_ISSUERS</span>
+        object. They are not generated by a live formula. They reflect a weighted compliance assessment across six GENIUS Act criteria plus qualitative issuer risk adjustments.
+      </div>
+
+      <div style="overflow-x:auto;">
+        <table class="dash-table" style="min-width:860px;">
+          <thead>
+            <tr>
+              <th>Criterion</th>
+              <th style="color:#1a7aff;">USDC</th>
+              <th style="color:#00d4aa;">USAT</th>
+              <th style="color:#ff4757;">USDT</th>
+              <th style="color:#f5a623;">USDY</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Reserve quality (1:1 qualifying assets)</td>
+              <td><strong>100%</strong></td>
+              <td><strong>100%</strong></td>
+              <td><strong>78%</strong></td>
+              <td><strong>95%</strong></td>
+            </tr>
+            <tr>
+              <td>US licensing (OCC/state)</td>
+              <td>✓ NYDFS + OCC</td>
+              <td>✓ OCC national bank</td>
+              <td>✗ none</td>
+              <td>✗ SEC Reg S only</td>
+            </tr>
+            <tr>
+              <td>Monthly attestation</td>
+              <td>✓ Deloitte</td>
+              <td>✓ OCC exam</td>
+              <td>✗ quarterly</td>
+              <td>✗ irregular</td>
+            </tr>
+            <tr>
+              <td>AML/CFT compliance</td>
+              <td>✓ full</td>
+              <td>✓ full</td>
+              <td>△ partial</td>
+              <td>△ restricted</td>
+            </tr>
+            <tr>
+              <td>Redemption at par</td>
+              <td>✓ 24/7</td>
+              <td>✓ yes</td>
+              <td>△ limits</td>
+              <td>✗ yield-adjusted</td>
+            </tr>
+            <tr>
+              <td>No yield to holders</td>
+              <td>✓ yes</td>
+              <td>✓ yes</td>
+              <td>✓ yes</td>
+              <td>✗ earns ~3.5% APY</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:14px;">
+        <div style="padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;">
+          <div style="font-family:var(--display);font-size:13px;font-weight:700;color:#1a7aff;margin-bottom:6px;">USDC — 95/100</div>
+          <div style="font-size:11px;color:var(--text2);line-height:1.7;">Loses 5 points mainly for issuer concentration and business-model sensitivity to lower rates. Otherwise it is the benchmark compliant issuer: full qualifying reserves, monthly Deloitte attestation, strong licensing position, and institutional-grade custody.</div>
+        </div>
+        <div style="padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;">
+          <div style="font-family:var(--display);font-size:13px;font-weight:700;color:#00d4aa;margin-bottom:6px;">USAT — 80/100</div>
+          <div style="font-size:11px;color:var(--text2);line-height:1.7;">Loses 20 points mainly because it is early-stage with a short operating history and limited track record. Regulatory architecture is strong, but treasury policy should still cap exposure until the issuer has a longer live attestation history.</div>
+        </div>
+        <div style="padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;">
+          <div style="font-family:var(--display);font-size:13px;font-weight:700;color:#ff4757;margin-bottom:6px;">USDT — 15/100</div>
+          <div style="font-size:11px;color:var(--text2);line-height:1.7;">Loses 85 points because it fails the GENIUS Act standard on US licensing, monthly attestation, and reserve quality. Around 22% of reserves are non-qualifying, and the issuer sits outside the US bank/PPSI perimeter. It may still be usable for some non-US corridors, but not as a compliant US treasury asset.</div>
+        </div>
+        <div style="padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;">
+          <div style="font-family:var(--display);font-size:13px;font-weight:700;color:#f5a623;margin-bottom:6px;">USDY — 40/100</div>
+          <div style="font-size:11px;color:var(--text2);line-height:1.7;">Loses 60 points because yield to holders is explicitly inconsistent with GENIUS Act payment stablecoin treatment, and the product is restricted to non-US investors. Reserve quality is relatively strong, but the legal wrapper makes it unsuitable as a mainstream compliant corporate payment stablecoin.</div>
+        </div>
+      </div>
+
+      <div style="margin-top:14px;padding:12px 14px;background:rgba(26,122,255,0.07);border:1px solid rgba(26,122,255,0.2);border-radius:10px;font-size:11px;color:var(--text2);line-height:1.7;">
+        <strong style="color:var(--text);">Important:</strong> these scores are policy scores for the dashboard prototype. They are meant to explain treasury suitability under a GENIUS Act lens, not to represent a formal regulatory rating issued by a supervisor.
+      </div>
     </div>
   </div>
 </div>
